@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" 
+  content="width=device-width, initial-scale=1.0, 
+  maximum-scale=1.0, user-scalable=no">
+<title>Offline Chromatic Tuner</title>
+<style>
+  :root {
+    --bg-color: #121212;
+    --card-color: #1e1e1e;
+    --text-color: #ffffff;
+    --accent-color: #00e676;
+    --accent-flat: #ff3d00;
+    --accent-sharp: #29b6f6;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 
+      "Segoe UI", Roboto, Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 10px;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 440px;
+    background: var(--card-color);
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .section-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: #252525;
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  .dropdown-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+  }
+
+  select {
+    background: #121212;
+    color: white;
+    border: 1px solid #444;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    outline: none;
+    width: 100%;
+  }
+
+  .btn {
+    background: var(--accent-color);
+    color: #000;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.1s;
+  }
+
+  .btn.stop {
+    background: #cf6679;
+    color: white;
+  }
+
+  .section-display {
+    background: #000000;
+    border-radius: 12px;
+    padding: 20px 10px;
+    text-align: center;
+    border: 2px solid #282828;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .note-display {
+    font-size: 4rem;
+    font-weight: 900;
+    line-height: 1.1;
+    color: #333;
+  }
+
+  .note-display.active {
+    color: var(--text-color);
+  }
+
+  .frequency-display {
+    font-size: 1.1rem;
+    color: #666;
+    font-family: monospace;
+    margin-top: 2px;
+  }
+
+  .meter-container {
+    width: 90%;
+    height: 40px;
+    position: relative;
+    margin: 15px 0 10px 0;
+  }
+
+  .meter-line {
+    position: absolute;
+    width: 100%;
+    height: 4px;
+    background: #222;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .meter-center {
+    position: absolute;
+    width: 4px;
+    height: 20px;
+    background: var(--accent-color);
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+  }
+
+  .meter-pointer {
+    position: absolute;
+    width: 6px;
+    height: 26px;
+    background: #fff;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    transition: left 0.08s ease-out;
+    z-index: 3;
+    border-radius: 3px;
+  }
+
+  .cents-display {
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: #555;
+    height: 20px;
+  }
+
+  .section-guide {
+    background: #1a1a1a;
+    padding: 12px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .target-strings {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .string-badge {
+    background: #2a2a2a;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: #555;
+    border: 1px solid transparent;
+  }
+
+  .string-badge.highlight {
+    background: #00e67622;
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+  }
+
+  .status {
+    text-align: center;
+    font-size: 0.8rem;
+    color: #666;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="section-controls">
+    <div class="dropdown-grid">
+      <div class="control-group">
+        <label for="instrument">Instrument</label>
+        <select id="instrument">
+          <option value="chromatic">Chromatic</option>
+          <option value="guitar6">Guitar (6-S)</option>
+          <option value="guitar7">Guitar (7-S)</option>
+          <option value="bass4" selected>Bass (4-S)</option>
+          <option value="bass5">Bass (5-S)</option>
+          <option value="ukulele">Ukulele</option>
+          <option value="violin">Violin</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label for="reference">A4 Tuning</label>
+        <select id="reference">
+          <option value="440">440 Hz</option>
+          <option value="442">442 Hz</option>
+          <option value="444">444 Hz</option>
+          <option value="432">432 Hz</option>
+        </select>
+      </div>
+    </div>
+    <button id="actionBtn" class="btn">Start Tuner</button>
+  </div>
+
+  <div class="section-display">
+    <div id="note" class="note-display">--</div>
+    <div id="frequency" class="frequency-display">0.00 Hz</div>
+    
+    <div class="meter-container">
+      <div class="meter-line"></div>
+      <div class="meter-center"></div>
+      <div id="pointer" class="meter-pointer"></div>
+    </div>
+    
+    <div id="cents" class="cents-display">Ready</div>
+  </div>
+
+  <div class="section-guide">
+    <label style="text-align: center; display: block;">
+      String Tuning Target
+    </label>
+    <div id="stringsBox" class="target-strings"></div>
+    <div id="status" class="status">Offline Mode Active</div>
+  </div>
+</div>
+<script>
+  const presets = {
+    chromatic: [],
+    guitar6: ['E2', 'A2', 'D3', 'G3', 'B3', 'E4'],
+    guitar7: ['B1', 'E2', 'A2', 'D3', 'G3', 'B3', 'E4'],
+    bass4: ['E1', 'A1', 'D2', 'G2'],
+    bass5: ['B0', 'E1', 'A1', 'D2', 'G2'],
+    ukulele: ['G4', 'C4', 'E4', 'A4'],
+    violin: ['G3', 'D4', 'A4', 'E5']
+  };
+
+  const noteNames = [
+    "C", "C#", "D", "D#", "E", "F", 
+    "F#", "G", "G#", "A", "A#", "B"
+  ];
+
+  let audioCtx = null, analyser = null;
+  let stream = null, isRunning = false;
+  let animationId = null, sampleRate = 44100;
+  const FFT_SIZE = 4096;
+
+  const actionBtn = document.getElementById('actionBtn');
+  const instrumentSelect = document.getElementById('instrument');
+  const referenceSelect = document.getElementById('reference');
+  const noteDisplay = document.getElementById('note');
+  const freqDisplay = document.getElementById('frequency');
+  const pointer = document.getElementById('pointer');
+  const centsDisplay = document.getElementById('cents');
+  const stringsBox = document.getElementById('stringsBox');
+  const statusDisplay = document.getElementById('status');
+
+  function updateStringGuide() {
+    stringsBox.innerHTML = '';
+    const inst = instrumentSelect.value;
+    if (inst === 'chromatic') {
+      stringsBox.innerHTML = 
+        '<span class="string-badge" style="color:#888;">' +
+        'All Notes Active</span>';
+      return;
+    }
+    presets[inst].forEach(str => {
+      const badge = document.createElement('span');
+      badge.className = 'string-badge';
+      badge.id = `str-${str}`;
+      badge.textContent = str;
+      stringsBox.appendChild(badge);
+    });
+  }
+
+  instrumentSelect.addEventListener('change', updateStringGuide);
+  updateStringGuide();
+
+  actionBtn.addEventListener('click', async () => {
+    if (isRunning) { stopTuner(); } else { await startTuner(); }
+  });
+
+  async function startTuner() {
+    try {
+      const AudioCtxClass = window.AudioContext || 
+        window.webkitAudioContext;
+      audioCtx = new AudioCtxClass({ latencyHint: 'interactive' });
+      sampleRate = audioCtx.sampleRate;
+
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { 
+          echoCancellation: false, 
+          noiseSuppression: false, 
+          autoGainControl: true 
+        }
+      });
+
+      const source = audioCtx.createMediaStreamSource(stream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = FFT_SIZE;
+      source.connect(analyser);
+      
+      isRunning = true;
+      actionBtn.textContent = 'Stop Tuner';
+      actionBtn.classList.add('stop');
+      statusDisplay.textContent = 'Listening...';
+      noteDisplay.classList.add('active');
+
+      updatePitch();
+    } catch (err) {
+      alert('Microphone Access Required.');
+      statusDisplay.textContent = 'Mic access denied';
+    }
+  }
+
+  function stopTuner() {
+    isRunning = false;
+    if (animationId) cancelAnimationFrame(animationId);
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    if (audioCtx) audioCtx.close();
+
+    actionBtn.textContent = 'Start Tuner';
+    actionBtn.classList.remove('stop');
+    statusDisplay.textContent = 'Tuner stopped';
+    noteDisplay.textContent = '--';
+    noteDisplay.classList.remove('active');
+    freqDisplay.textContent = '0.00 Hz';
+    pointer.style.left = '50%';
+    pointer.style.backgroundColor = '#fff';
+    centsDisplay.textContent = 'Ready';
+    centsDisplay.style.color = '#555';
+    document.querySelectorAll('.string-badge')
+      .forEach(b => b.classList.remove('highlight'));
+  }
+  function autoCorrelate(buffer, sampleRate) {
+    const size = buffer.length;
+    let rms = 0;
+    for (let i = 0; i < size; i++) { rms += buffer[i] * buffer[i]; }
+    rms = Math.sqrt(rms / size);
+    if (rms < 0.015) return -1; 
+
+    let r1 = 0, r2 = size - 1;
+    const thres = 0.2;
+    for (let i = 0; i < size / 2; i++) { 
+      if (Math.abs(buffer[i]) < thres) { r1 = i; break; } 
+    }
+    for (let i = size - 1; i >= size / 2; i--) { 
+      if (Math.abs(buffer[i]) < thres) { r2 = i; break; } 
+    }
+    const clipped = buffer.slice(r1, r2);
+    const clippedSize = clipped.length;
+
+    const c = new Float32Array(clippedSize);
+    for (let i = 0; i < clippedSize; i++) {
+      for (let j = 0; j < clippedSize - i; j++) { 
+        c[i] += clipped[j] * clipped[j + i]; 
+      }
+    }
+
+    let d = 0;
+    while (d < clippedSize - 1 && c[d] > 0) d++;
+
+    let maxVal = -1, maxPeriod = -1;
+    for (let i = d; i < clippedSize; i++) {
+      if (c[i] > maxVal) { maxVal = c[i]; maxPeriod = i; }
+    }
+
+    let T0 = maxPeriod;
+    if (T0 > 0 && T0 < clippedSize - 1) {
+      const alpha = c[T0 - 1], beta = c[T0], gamma = c[T0 + 1];
+      const p = 0.5 * (alpha - gamma) / (alpha - 2 * beta + gamma);
+      T0 = T0 + p;
+    }
+
+    return sampleRate / T0;
+  }
+
+  function getNoteDetails(frequency, refA4) {
+    const noteNum = 12 * (Math.log(frequency / refA4) / 
+      Math.log(2)) + 69;
+    const roundedNote = Math.round(noteNum);
+    const cents = Math.round((noteNum - roundedNote) * 100);
+    const name = noteNames[roundedNote % 12] + 
+      (Math.floor(roundedNote / 12) - 1);
+    return { name, cents };
+  }
+
+  function updatePitch() {
+    if (!isRunning) return;
+
+    const buffer = new Float32Array(FFT_SIZE);
+    analyser.getFloatTimeDomainData(buffer);
+    const frequency = autoCorrelate(buffer, sampleRate);
+    const refA4 = parseInt(referenceSelect.value, 10);
+
+    if (frequency > 25 && frequency < 1200) {
+      freqDisplay.textContent = frequency.toFixed(2) + ' Hz';
+      const noteInfo = getNoteDetails(frequency, refA4);
+      noteDisplay.textContent = noteInfo.name;
+
+      document.querySelectorAll('.string-badge')
+        .forEach(b => b.classList.remove('highlight'));
+      const activeBadge = document.getElementById(
+        `str-${noteInfo.name}`
+      );
+      if (activeBadge) activeBadge.classList.add('highlight');
+
+      const maxCents = 50;
+      let displayCents = Math.max(-maxCents, 
+        Math.min(maxCents, noteInfo.cents));
+      const percentOffset = 50 + (displayCents / maxCents) * 50;
+      pointer.style.left = `${percentOffset}%`;
+
+      if (Math.abs(noteInfo.cents) <= 3) {
+        pointer.style.backgroundColor = 'var(--accent-color)';
+        centsDisplay.textContent = 'In Tune';
+        centsDisplay.style.color = 'var(--accent-color)';
+      } else if (noteInfo.cents < 0) {
+        pointer.style.backgroundColor = 'var(--accent-flat)';
+        centsDisplay.textContent = `${noteInfo.cents} cents (Flat)`;
+        centsDisplay.style.color = 'var(--accent-flat)';
+      } else {
+        pointer.style.backgroundColor = 'var(--accent-sharp)';
+        centsDisplay.textContent = `+${noteInfo.cents} (Sharp)`;
+        centsDisplay.style.color = 'var(--accent-sharp)';
+      }
+    }
+    animationId = requestAnimationFrame(updatePitch);
+  }
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      const swCode = `
+        const NAME = 'tuner-v3';
+        self.addEventListener('install', e => {
+          e.waitUntil(caches.open(NAME).then(c => 
+            c.addAll(['./', './' + 
+            location.pathname.split('/').pop()])));
+        });
+        self.addEventListener('fetch', e => {
+          e.respondWith(caches.match(e.request)
+            .then(r => r || fetch(e.request)));
+        });
+      `;
+      const blob = new Blob([swCode], { 
+        type: 'application/javascript' 
+      });
+      const url = URL.createObjectURL(blob);
+      navigator.serviceWorker.register(url, { scope: './' })
+        .catch(() => console.log('Sandbox execution mode'));
+    });
+  }
+</script>
+</body>
+</html>
